@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de BPM</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 50px;
+            background-color: #f0f0f0;
+        }
+        #tapButton, #resetButton {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            margin: 10px;
+            color: white;
+            min-width: 150px; /* Para manter tamanho similar */
+            transition: background-color 0.2s ease;
+        }
+        #tapButton {
+            background-color: #007bff;
+        }
+        #tapButton:hover {
+            background-color: #0056b3;
+        }
+        #resetButton {
+            background-color: #dc3545;
+        }
+        #resetButton:hover {
+            background-color: #c82333;
+        }
+        .results {
+            margin-top: 30px;
+            font-size: 1.1em;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            min-width: 250px;
+            text-align: center;
+        }
+        .results p {
+            margin: 10px 0;
+        }
+        #bpmDisplay {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #28a745;
+            display: block; /* Para ocupar linha própria */
+            margin-bottom: 15px;
+        }
+        #starsDisplay {
+            margin-top: 15px;
+            font-size: 1.5em;
+            color: #ffc107; /* Cor amarela para estrelas */
+            word-break: break-all; /* Quebra linha se as estrelas forem muitas */
+            line-height: 1.2;
+        }
+         strong {
+             color: #333;
+         }
+    </style>
+</head>
+<body>
+
+    <h1>Calculadora de BPM por Toque</h1>
+
+    <button id="tapButton">Começar</button>
+    <button id="resetButton">Reiniciar</button>
+
+    <div class="results">
+        <p><strong>BPM Estimado:</strong></p>
+        <span id="bpmDisplay">--</span>
+
+        <p><strong>Cliques:</strong> <span id="clickCount">0</span></p>
+        <p><strong>Variância (ms²):</strong> <span id="varianceDisplay">--</span></p>
+        <div id="starsDisplay"></div>
+    </div>
+
+    <script>
+        const tapButton = document.getElementById('tapButton');
+        const resetButton = document.getElementById('resetButton');
+        const clickCountDisplay = document.getElementById('clickCount');
+        const bpmDisplay = document.getElementById('bpmDisplay');
+        const varianceDisplay = document.getElementById('varianceDisplay');
+        const starsDisplay = document.getElementById('starsDisplay');
+
+        let clickTimestamps = [];
+        let isTiming = false;
+        const minClicksForStableBPM = 4; // Precisa de pelo menos 4 cliques para calcular BPM e variância com 3 intervalos
+        let timeoutId = null;
+        const resetTimeoutDuration = 3000; // Reseta após 3 segundos de inatividade
+
+        // --- Funções Auxiliares ---
+
+        function calculateIntervals(timestamps) {
+            if (timestamps.length < 2) {
+                return [];
+            }
+            const intervals = [];
+            for (let i = 1; i < timestamps.length; i++) {
+                intervals.push(timestamps[i] - timestamps[i - 1]);
+            }
+            return intervals;
+        }
+
+        function calculateAverage(numbers) {
+            if (numbers.length === 0) {
+                return 0;
+            }
+            const sum = numbers.reduce((acc, val) => acc + val, 0);
+            return sum / numbers.length;
+        }
+
+        // Calcula a variância amostral (divide por n-1)
+        function calculateVariance(numbers) {
+            if (numbers.length < 2) {
+                return 0; // Variância não definida para menos de 2 pontos
+            }
+            const mean = calculateAverage(numbers);
+            const squaredDiffs = numbers.map(num => Math.pow(num - mean, 2));
+            const sumSquaredDiffs = squaredDiffs.reduce((acc, val) => acc + val, 0);
+            // Usamos n-1 para variância amostral, que é geralmente o que se quer aqui
+            return sumSquaredDiffs / (numbers.length - 1);
+        }
+
+        function updateDisplay() {
+            const clickCount = clickTimestamps.length;
+            clickCountDisplay.textContent = clickCount;
+            starsDisplay.textContent += '*'; // Adiciona uma estrela
+
+            if (clickCount < minClicksForStableBPM) {
+                bpmDisplay.textContent = '--';
+                varianceDisplay.textContent = '--';
+            } else {
+                const intervals = calculateIntervals(clickTimestamps);
+                if (intervals.length > 0) {
+                    const averageInterval = calculateAverage(intervals);
+                    const bpm = 60000 / averageInterval; // 60000 ms em um minuto
+                    const variance = calculateVariance(intervals);
+
+                    bpmDisplay.textContent = bpm.toFixed(1); // BPM com 1 casa decimal
+                    varianceDisplay.textContent = variance.toFixed(2); // Variância com 2 casas decimais
+                }
+            }
+        }
+
+        function resetState() {
+            clickTimestamps = [];
+            isTiming = false;
+            clearTimeout(timeoutId); // Limpa o timeout de reset automático
+            timeoutId = null;
+
+            clickCountDisplay.textContent = '0';
+            bpmDisplay.textContent = '--';
+            varianceDisplay.textContent = '--';
+            starsDisplay.textContent = '';
+            tapButton.textContent = 'Começar';
+            console.log("Contagem Reiniciada");
+        }
+
+        // --- Event Listeners ---
+
+        tapButton.addEventListener('click', () => {
+            const now = performance.now(); // Use performance.now() para medições de tempo mais precisas
+
+            // Limpa o timeout anterior para evitar reset se o clique for rápido
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+
+            if (!isTiming) {
+                // Primeiro clique após reset ou início
+                resetState(); // Garante que tudo esteja limpo antes de começar
+                isTiming = true;
+                tapButton.textContent = 'Toque!';
+            }
+
+            clickTimestamps.push(now);
+            updateDisplay();
+
+            // Configura um novo timeout para resetar se não houver mais cliques
+            timeoutId = setTimeout(resetState, resetTimeoutDuration);
+        });
+
+        resetButton.addEventListener('click', resetState);
+
+        // Estado inicial ao carregar a página
+        resetState();
+
+    </script>
+
+</body>
+</html>
