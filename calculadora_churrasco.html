@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Churrasco</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .calculator-container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #c0392b; /* Cor de churrasco :) */
+            margin-bottom: 25px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input[type="number"] {
+            width: calc(100% - 22px); /* Ajuste para padding e borda */
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+         /* Remove as setinhas do input number em alguns navegadores */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield; /* Firefox */
+        }
+
+
+        button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background-color: #c0392b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-top: 20px;
+        }
+
+        button:hover {
+            background-color: #a53125;
+        }
+
+        #results {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border: 1px dashed #ccc;
+            border-radius: 4px;
+        }
+
+        #results h2 {
+            margin-top: 0;
+            color: #333;
+            text-align: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        #results ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        #results li {
+            margin-bottom: 8px;
+            color: #555;
+            padding-left: 25px; /* Espaço para ícone */
+            position: relative;
+        }
+
+         /* Ícones simples (poderiam ser imagens ou fontes de ícones) */
+        #results li::before {
+            content: '🥩'; /* Ícone padrão */
+            position: absolute;
+            left: 0;
+            top: 1px;
+        }
+        #results li.beer::before { content: '🍺'; }
+        #results li.soda::before { content: '🥤'; }
+        #results li.water::before { content: '💧'; }
+        #results li.side::before { content: '🥗'; }
+        #results li.bread::before { content: '🥖'; }
+        #results li.charcoal::before { content: '🔥'; }
+        #results li.ice::before { content: '🧊'; }
+
+
+        .disclaimer {
+            font-size: 0.8em;
+            color: #777;
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        /* Estilo para quando não há resultados */
+         #results:empty {
+             display: none;
+         }
+
+    </style>
+</head>
+<body>
+
+    <div class="calculator-container">
+        <h1>Calculadora de Churrasco</h1>
+
+        <div class="input-group">
+            <label for="homens">Número de Homens:</label>
+            <input type="number" id="homens" min="0" value="0">
+        </div>
+
+        <div class="input-group">
+            <label for="mulheres">Número de Mulheres:</label>
+            <input type="number" id="mulheres" min="0" value="0">
+        </div>
+
+        <div class="input-group">
+            <label for="criancas">Número de Crianças (até 10 anos):</label>
+            <input type="number" id="criancas" min="0" value="0">
+        </div>
+
+        <button id="calculateBtn">Calcular Quantidades</button>
+
+        <div id="results">
+            <!-- Os resultados serão inseridos aqui pelo JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        // --- Configurações (Ajuste conforme preferência) ---
+        const config = {
+            carnePorHomem: 450,     // gramas
+            carnePorMulher: 350,    // gramas
+            carnePorCrianca: 200,   // gramas
+            // Distribuição da carne (soma deve ser 1 ou 100%)
+            pctCarneBovina: 0.50,   // 50%
+            pctFrango: 0.25,        // 25% (inclui asa, coração, etc.)
+            pctLinguicaPorco: 0.25, // 25% (inclui linguiça, porco)
+
+            acompanhamentoPorAdulto: 150, // gramas (ex: farofa, vinagrete, maionese)
+            acompanhamentoPorCrianca: 80, // gramas
+
+            paoDeAlhoPorPessoa: 1,     // unidades
+
+            cervejaPorAdultoQueBebe: 1500, // ml (aprox. 2-3 garrafas 600ml ou 4-5 latas)
+            // Considerar que nem todos adultos bebem cerveja (ajuste a lógica se precisar)
+            // Simplificação: Calcular para todos os homens e metade das mulheres.
+            pctMulheresBebemCerveja: 0.5,
+
+            refriAguaPorAdultoNaoBebe: 1000, // ml
+            refriAguaPorCrianca: 600,        // ml
+
+            carvaoBaseKg: 4,           // kg (independente do nº pessoas)
+            carvaoPorKgCarne: 1,       // kg de carvão por kg de carne
+
+            geloBaseKg: 5,             // kg
+            geloPorPessoa: 0.5,        // kg
+        };
+
+        // --- Elementos do DOM ---
+        const homensInput = document.getElementById('homens');
+        const mulheresInput = document.getElementById('mulheres');
+        const criancasInput = document.getElementById('criancas');
+        const calculateBtn = document.getElementById('calculateBtn');
+        const resultsDiv = document.getElementById('results');
+
+        // --- Função de Cálculo ---
+        function calcularChurrasco() {
+            const homens = parseInt(homensInput.value) || 0;
+            const mulheres = parseInt(mulheresInput.value) || 0;
+            const criancas = parseInt(criancasInput.value) || 0;
+
+            const totalAdultos = homens + mulheres;
+            const totalPessoas = totalAdultos + criancas;
+
+            if (totalPessoas === 0) {
+                resultsDiv.innerHTML = '<p style="text-align:center; color: #c0392b;">Por favor, informe o número de convidados.</p>';
+                return;
+            }
+
+            // --- Cálculos ---
+
+            // Carne Total (em gramas)
+            const carneTotalG = (homens * config.carnePorHomem) +
+                                (mulheres * config.carnePorMulher) +
+                                (criancas * config.carnePorCrianca);
+            const carneTotalKg = carneTotalG / 1000;
+
+            // Tipos de Carne (em Kg)
+            const carneBovinaKg = carneTotalKg * config.pctCarneBovina;
+            const frangoKg = carneTotalKg * config.pctFrango;
+            const linguicaPorcoKg = carneTotalKg * config.pctLinguicaPorco;
+
+            // Acompanhamentos (em gramas)
+            const acompanhamentoTotalG = (totalAdultos * config.acompanhamentoPorAdulto) +
+                                         (criancas * config.acompanhamentoPorCrianca);
+            const acompanhamentoTotalKg = acompanhamentoTotalG / 1000;
+
+            // Pão de Alho (unidades)
+            const paoDeAlhoTotal = totalPessoas * config.paoDeAlhoPorPessoa;
+
+            // Bebidas (em ml)
+            const adultosQueBebemCerveja = homens + (mulheres * config.pctMulheresBebemCerveja);
+            const cervejaTotalMl = adultosQueBebemCerveja * config.cervejaPorAdultoQueBebe;
+            const cervejaTotalL = cervejaTotalMl / 1000;
+
+            const adultosNaoBebem = mulheres * (1 - config.pctMulheresBebemCerveja);
+            const refriAguaMl = (adultosNaoBebem * config.refriAguaPorAdultoNaoBebe) +
+                                (criancas * config.refriAguaPorCrianca);
+            const refriAguaL = refriAguaMl / 1000;
+
+             // Descartáveis e Outros
+             const carvaoKg = config.carvaoBaseKg + (carneTotalKg * config.carvaoPorKgCarne);
+             const geloKg = config.geloBaseKg + (totalPessoas * config.geloPorPessoa);
+
+            // --- Exibição dos Resultados ---
+            resultsDiv.innerHTML = `
+                <h2>Lista de Compras Sugerida:</h2>
+                <ul>
+                    <li><strong>Carne Total:</strong> ${carneTotalKg.toFixed(2)} kg</li>
+                    <li style="padding-left: 45px;">↳ Bovina: ${carneBovinaKg.toFixed(2)} kg</li>
+                    <li style="padding-left: 45px;">↳ Frango (Asa, Coração, etc.): ${frangoKg.toFixed(2)} kg</li>
+                    <li style="padding-left: 45px;">↳ Linguiça / Porco: ${linguicaPorcoKg.toFixed(2)} kg</li>
+
+                    <li class="side"><strong>Acompanhamentos:</strong> ${acompanhamentoTotalKg.toFixed(2)} kg (Ex: Farofa, Vinagrete, Maionese)</li>
+                    <li class="bread"><strong>Pão de Alho:</strong> ${Math.ceil(paoDeAlhoTotal)} unidades</li>
+
+                    <li class="beer"><strong>Cerveja:</strong> ${cervejaTotalL.toFixed(1)} L</li>
+                    <li class="soda"><strong>Refrigerante / Suco / Água:</strong> ${refriAguaL.toFixed(1)} L</li>
+
+                    <li class="charcoal"><strong>Carvão:</strong> ${carvaoKg.toFixed(1)} kg</li>
+                    <li class="ice"><strong>Gelo:</strong> ${geloKg.toFixed(1)} kg</li>
+                </ul>
+                <p class="disclaimer">
+                    *Quantidades aproximadas. Ajuste conforme o perfil dos seus convidados e a duração do evento.
+                </p>
+            `;
+             // Adiciona classes para ícones específicos
+             resultsDiv.querySelector('li:nth-child(5)')?.classList.add('side');
+             resultsDiv.querySelector('li:nth-child(6)')?.classList.add('bread');
+             resultsDiv.querySelector('li:nth-child(7)')?.classList.add('beer');
+             resultsDiv.querySelector('li:nth-child(8)')?.classList.add('soda'); // Pode ser 'water' tbm
+             resultsDiv.querySelector('li:nth-child(9)')?.classList.add('charcoal');
+             resultsDiv.querySelector('li:nth-child(10)')?.classList.add('ice');
+
+        }
+
+        // --- Event Listener ---
+        calculateBtn.addEventListener('click', calcularChurrasco);
+
+        // Opcional: Calcular ao pressionar Enter nos campos de input
+        homensInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                calcularChurrasco();
+            }
+        });
+         mulheresInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                calcularChurrasco();
+            }
+        });
+         criancasInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                calcularChurrasco();
+            }
+        });
+
+
+    </script>
+
+</body>
+</html>
