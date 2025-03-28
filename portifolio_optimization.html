@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador MPT Interativo com Otimização</title>
+    <style>
+        /* (Estilos CSS - idênticos aos da versão anterior, omitidos para brevidade) */
+         body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 800px;
+            margin: auto;
+            background-color: #f4f4f4;
+        }
+        h1, h2, h3 {
+            color: #333;
+            /*text-align: center;*/
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-top: 30px;
+        }
+         h1 { text-align: center; }
+        .container {
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        label {
+            display: inline-block; /* Changed for better alignment */
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+            min-width: 110px; /* Adjust as needed */
+            vertical-align: middle;
+        }
+        input[type="number"] {
+            width: 80px;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: right;
+            vertical-align: middle;
+        }
+        .asset-group, .correlation-group, .weights-group, .optimization-section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed #eee;
+        }
+        .asset-item {
+            /*display: flex;*/
+            /*align-items: center;*/
+            /*gap: 15px;*/
+            margin-bottom: 10px;
+            /*flex-wrap: wrap;*/
+        }
+         .asset-item span {
+            display: inline-block;
+            min-width: 60px;
+            font-weight: bold;
+             vertical-align: middle;
+             margin-right: 10px;
+        }
+        .correlation-matrix table {
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .correlation-matrix th, .correlation-matrix td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: center;
+        }
+        .correlation-matrix th {
+            background-color: #e9ecef;
+        }
+        .correlation-matrix input {
+            width: 60px;
+            margin-bottom: 0;
+        }
+        .results, .optimization-results {
+            background-color: #e9f5ff;
+            padding: 15px;
+            border-left: 5px solid #007bff;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+         .optimization-results {
+             background-color: #e2f0d9; /* Light green */
+             border-left-color: #28a745; /* Green */
+         }
+        .results p, .optimization-results p {
+            margin: 5px 0;
+            font-size: 1.1em;
+        }
+        .results strong, .optimization-results strong {
+            color: #0056b3;
+        }
+         .optimization-results strong {
+             color: #155724; /* Darker green */
+         }
+        #weight-sum {
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .warning {
+            color: #dc3545; /* Vermelho para aviso */
+        }
+        .ok {
+            color: #28a745; /* Verde para OK */
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.2s;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+         button:disabled {
+             background-color: #ccc;
+             cursor: not-allowed;
+         }
+        input:read-only {
+            background-color: #eee;
+            cursor: not-allowed;
+        }
+        #optimization-status {
+            margin-left: 15px;
+            font-style: italic;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Simulador MPT Interativo com Otimização</h1>
+
+    <div class="container">
+        <h2>Parâmetros dos Ativos (Anualizado)</h2>
+        <div class="asset-group">
+            <div class="asset-item">
+                <span>Ativo 1:</span>
+                <label for="ret1">Ret. Esp. (%):</label>
+                <input type="number" id="ret1" value="12" step="0.1" oninput="clearOptimizationResults(); updateCalculations();">
+                <label for="risk1">Risco (DP %):</label>
+                <input type="number" id="risk1" value="20" step="0.1" min="0" oninput="clearOptimizationResults(); updateCalculations();">
+            </div>
+            <div class="asset-item">
+                <span>Ativo 2:</span>
+                <label for="ret2">Ret. Esp. (%):</label>
+                <input type="number" id="ret2" value="5" step="0.1" oninput="clearOptimizationResults(); updateCalculations();">
+                <label for="risk2">Risco (DP %):</label>
+                <input type="number" id="risk2" value="8" step="0.1" min="0" oninput="clearOptimizationResults(); updateCalculations();">
+            </div>
+            <div class="asset-item">
+                <span>Ativo 3:</span>
+                <label for="ret3">Ret. Esp. (%):</label>
+                <input type="number" id="ret3" value="8" step="0.1" oninput="clearOptimizationResults(); updateCalculations();">
+                <label for="risk3">Risco (DP %):</label>
+                <input type="number" id="risk3" value="15" step="0.1" min="0" oninput="clearOptimizationResults(); updateCalculations();">
+            </div>
+        </div>
+
+        <h2>Matriz de Correlação</h2>
+        <div class="correlation-group correlation-matrix">
+            <table>
+                <!-- (Tabela de Correlação - idêntica à anterior) -->
+                 <thead>
+                    <tr>
+                        <th></th>
+                        <th>Ativo 1</th>
+                        <th>Ativo 2</th>
+                        <th>Ativo 3</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <th>Ativo 1</th>
+                        <td><input type="number" id="corr-1-1" value="1.0" step="0.01" min="1" max="1" readonly></td>
+                        <td><input type="number" id="corr-1-2" value="0.2" step="0.01" min="-1" max="1" oninput="syncCorrelation('1', '2')"></td>
+                        <td><input type="number" id="corr-1-3" value="0.4" step="0.01" min="-1" max="1" oninput="syncCorrelation('1', '3')"></td>
+                    </tr>
+                    <tr>
+                        <th>Ativo 2</th>
+                        <td><input type="number" id="corr-2-1" value="0.2" step="0.01" min="-1" max="1" oninput="syncCorrelation('2', '1')"></td>
+                        <td><input type="number" id="corr-2-2" value="1.0" step="0.01" min="1" max="1" readonly></td>
+                        <td><input type="number" id="corr-2-3" value="0.1" step="0.01" min="-1" max="1" oninput="syncCorrelation('2', '3')"></td>
+                    </tr>
+                    <tr>
+                        <th>Ativo 3</th>
+                        <td><input type="number" id="corr-3-1" value="0.4" step="0.01" min="-1" max="1" oninput="syncCorrelation('3', '1')"></td>
+                        <td><input type="number" id="corr-3-2" value="0.1" step="0.01" min="-1" max="1" oninput="syncCorrelation('3', '2')"></td>
+                        <td><input type="number" id="corr-3-3" value="1.0" step="0.01" min="1" max="1" readonly></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Pesos do Portfólio (Alocação Manual)</h2>
+        <div class="weights-group">
+            <div class="asset-item">
+                <label for="w1">Peso Ativo 1 (%):</label>
+                <input type="number" id="w1" value="50" step="1" min="0" max="100" oninput="clearOptimizationResults(); updateCalculations();">
+            </div>
+             <div class="asset-item">
+                <label for="w2">Peso Ativo 2 (%):</label>
+                <input type="number" id="w2" value="30" step="1" min="0" max="100" oninput="clearOptimizationResults(); updateCalculations();">
+            </div>
+             <div class="asset-item">
+                <label for="w3">Peso Ativo 3 (%):</label>
+                <input type="number" id="w3" value="20" step="1" min="0" max="100" oninput="clearOptimizationResults(); updateCalculations();">
+            </div>
+            <div>
+                Soma dos Pesos: <span id="weight-sum">100.0%</span>
+            </div>
+        </div>
+
+        <div class="results">
+            <h3>Resultados do Portfólio (Manual)</h3>
+            <p>Retorno Esperado Anual: <strong id="portfolio-return">-%</strong></p>
+            <p>Risco Anual (Desvio Padrão): <strong id="portfolio-risk">-%</strong></p>
+             <p>Índice de Sharpe: <strong id="portfolio-sharpe">-%</strong> (calculado abaixo)</p>
+        </div>
+    </div>
+
+     <div class="container optimization-section">
+         <h2>Otimização do Portfólio (Máximo Sharpe Ratio)</h2>
+         <div>
+             <label for="rf-rate">Taxa Livre de Risco (% Anual):</label>
+             <input type="number" id="rf-rate" value="2.0" step="0.1" oninput="clearOptimizationResults(); updateCalculations();">
+         </div>
+          <div>
+             <label for="num-simulations">Nº de Simulações (Monte Carlo):</label>
+             <input type="number" id="num-simulations" value="10000" step="1000" min="1000">
+         </div>
+         <button id="optimize-button" onclick="optimizePortfolio()">Otimizar Portfólio (Max Sharpe)</button>
+         <span id="optimization-status"></span>
+
+        <div id="optimization-results-container" class="optimization-results" style="display: none;">
+             <h3>Resultados da Otimização</h3>
+             <p>Pesos Ótimos:</p>
+             <ul id="optimal-weights-list"></ul>
+             <p>Retorno Esperado Ótimo: <strong id="optimal-return">-%</strong></p>
+             <p>Risco Ótimo (Desvio Padrão): <strong id="optimal-risk">-%</strong></p>
+             <p>Índice de Sharpe Máximo: <strong id="optimal-sharpe">-%</strong></p>
+         </div>
+     </div>
+
+
+    <script>
+        const NUM_ASSETS = 3;
+
+        // --- Funções de Cálculo MPT --- (Idênticas à versão anterior)
+        function calculateCovarianceMatrix(stdDevs, correlationMatrix) {
+            const covarianceMatrix = Array(NUM_ASSETS).fill(0).map(() => Array(NUM_ASSETS).fill(0));
+            for (let i = 0; i < NUM_ASSETS; i++) {
+                for (let j = 0; j < NUM_ASSETS; j++) {
+                    covarianceMatrix[i][j] = correlationMatrix[i][j] * stdDevs[i] * stdDevs[j];
+                }
+            }
+            return covarianceMatrix;
+        }
+
+        function calculatePortfolioExpectedReturn(returns, weights) {
+            let portfolioReturn = 0;
+            for (let i = 0; i < NUM_ASSETS; i++) {
+                portfolioReturn += weights[i] * returns[i];
+            }
+            return portfolioReturn;
+        }
+
+        function calculatePortfolioVariance(weights, covarianceMatrix) {
+            let portfolioVariance = 0;
+            for (let i = 0; i < NUM_ASSETS; i++) {
+                for (let j = 0; j < NUM_ASSETS; j++) {
+                    portfolioVariance += weights[i] * weights[j] * covarianceMatrix[i][j];
+                }
+            }
+            return Math.max(0, portfolioVariance); // Avoid tiny negative variance
+        }
+
+         function calculateSharpeRatio(portfolioReturn, portfolioRisk, riskFreeRate) {
+            // Avoid division by zero or near-zero risk
+            if (portfolioRisk < 1e-9) {
+                // If risk is virtually zero, Sharpe is technically infinite if return > rfRate,
+                // zero if return == rfRate, and -infinite if return < rfRate.
+                // We'll return a very large number or 0 for simplicity, or handle as needed.
+                // Returning 0 is safer than Infinity in many contexts.
+                 return (portfolioReturn > riskFreeRate) ? Infinity : 0; // Or handle appropriately
+            }
+            return (portfolioReturn - riskFreeRate) / portfolioRisk;
+        }
+
+        // --- Funções da Interface ---
+
+        function getInputs() {
+            const returns = [];
+            const stdDevs = [];
+            const weights = [];
+            const correlationMatrix = Array(NUM_ASSETS).fill(0).map(() => Array(NUM_ASSETS).fill(0));
+
+            let totalWeight = 0;
+
+            for (let i = 1; i <= NUM_ASSETS; i++) {
+                const retPercent = parseFloat(document.getElementById(`ret${i}`).value) || 0;
+                const riskPercent = parseFloat(document.getElementById(`risk${i}`).value) || 0;
+                returns.push(retPercent / 100);
+                stdDevs.push(riskPercent / 100);
+
+                const weightPercent = parseFloat(document.getElementById(`w${i}`).value) || 0;
+                weights.push(weightPercent / 100);
+                totalWeight += weightPercent;
+
+                for (let j = 1; j <= NUM_ASSETS; j++) {
+                    correlationMatrix[i - 1][j - 1] = parseFloat(document.getElementById(`corr-${i}-${j}`).value) || 0;
+                    if (correlationMatrix[i - 1][j - 1] < -1) correlationMatrix[i - 1][j - 1] = -1;
+                    if (correlationMatrix[i - 1][j - 1] > 1) correlationMatrix[i - 1][j - 1] = 1;
+                    if (i === j) correlationMatrix[i-1][j-1] = 1.0;
+                    const corrInput = document.getElementById(`corr-${i}-${j}`);
+                    if (corrInput && corrInput.value !== correlationMatrix[i - 1][j - 1].toFixed(2)) {
+                       corrInput.value = correlationMatrix[i - 1][j - 1].toFixed(2);
+                    }
+                }
+            }
+
+            const weightSumEl = document.getElementById('weight-sum');
+            weightSumEl.textContent = `${totalWeight.toFixed(1)}%`;
+            weightSumEl.className = Math.abs(totalWeight - 100) < 0.1 ? 'ok' : 'warning'; // Slightly wider tolerance
+
+             // Get Risk Free Rate
+            const rfRatePercent = parseFloat(document.getElementById('rf-rate').value) || 0;
+            const rfRate = rfRatePercent / 100;
+
+            return { returns, stdDevs, weights, correlationMatrix, totalWeight, rfRate };
+        }
+
+        function updateCalculations() {
+            const { returns, stdDevs, weights, correlationMatrix, totalWeight, rfRate } = getInputs();
+
+            const covarianceMatrix = calculateCovarianceMatrix(stdDevs, correlationMatrix);
+            const portfolioReturn = calculatePortfolioExpectedReturn(returns, weights);
+            const portfolioVariance = calculatePortfolioVariance(weights, covarianceMatrix);
+            const portfolioRisk = Math.sqrt(portfolioVariance);
+            const portfolioSharpe = calculateSharpeRatio(portfolioReturn, portfolioRisk, rfRate);
+
+            document.getElementById('portfolio-return').textContent = `${(portfolioReturn * 100).toFixed(2)}%`;
+            document.getElementById('portfolio-risk').textContent = `${(portfolioRisk * 100).toFixed(2)}%`;
+
+            // Display Sharpe Ratio, handle potential Infinity
+            const sharpeDisplay = isFinite(portfolioSharpe) ? portfolioSharpe.toFixed(3) : (portfolioSharpe > 0 ? "+Inf" : "-Inf");
+            document.getElementById('portfolio-sharpe').textContent = `${sharpeDisplay}`;
+
+             // Check weights sum strictly for calculations, visually allow small errors
+             if (Math.abs(totalWeight - 100) > 0.1) {
+                 console.warn("Soma dos pesos (manual) não é 100%!");
+                  // You might want to gray out results or add a specific warning message here
+             }
+        }
+
+        function syncCorrelation(row, col) {
+            const sourceInput = document.getElementById(`corr-${row}-${col}`);
+            const targetInput = document.getElementById(`corr-${col}-${row}`);
+            if (sourceInput && targetInput) {
+                let value = parseFloat(sourceInput.value);
+                if (isNaN(value)) value = 0;
+                value = Math.max(-1, Math.min(1, value));
+                sourceInput.value = value.toFixed(2);
+                targetInput.value = value.toFixed(2);
+            }
+             clearOptimizationResults(); // Clear opt results if correlations change
+            updateCalculations();
+        }
+
+        function clearOptimizationResults() {
+             document.getElementById('optimization-results-container').style.display = 'none';
+             document.getElementById('optimization-status').textContent = '';
+        }
+
+
+        // --- Otimização ---
+        function optimizePortfolio() {
+            const optimizeButton = document.getElementById('optimize-button');
+            const statusSpan = document.getElementById('optimization-status');
+
+            optimizeButton.disabled = true;
+            statusSpan.textContent = 'Otimizando...';
+            clearOptimizationResults(); // Clear previous results visually
+
+            // Use setTimeout to allow the UI to update before heavy calculation starts
+            setTimeout(() => {
+                const { returns, stdDevs, correlationMatrix, rfRate } = getInputs();
+                const numSimulations = parseInt(document.getElementById('num-simulations').value) || 10000;
+
+                if (returns.length !== NUM_ASSETS || stdDevs.length !== NUM_ASSETS) {
+                    alert("Erro: Verifique os parâmetros dos ativos.");
+                    statusSpan.textContent = 'Erro nos inputs.';
+                    optimizeButton.disabled = false;
+                    return;
+                }
+
+                const covarianceMatrix = calculateCovarianceMatrix(stdDevs, correlationMatrix);
+
+                let bestSharpe = -Infinity;
+                let bestWeights = [];
+                let bestReturn = 0;
+                let bestRisk = 0;
+
+                for (let i = 0; i < numSimulations; i++) {
+                    // 1. Generate random weights that sum to 1
+                    let randomNums = Array.from({ length: NUM_ASSETS }, () => Math.random());
+                    const sumRandom = randomNums.reduce((sum, val) => sum + val, 0);
+                    const currentWeights = randomNums.map(val => val / sumRandom);
+
+                     // Ensure weights sum exactly to 1 (handle potential floating point issues if needed, though normalization helps)
+                     const weightSumCheck = currentWeights.reduce((s, w) => s + w, 0);
+                     if (Math.abs(weightSumCheck - 1.0) > 1e-9) {
+                         // Adjust last weight slightly if needed, though rare with this method
+                         currentWeights[NUM_ASSETS - 1] = 1.0 - currentWeights.slice(0, NUM_ASSETS - 1).reduce((s, w) => s + w, 0);
+                     }
+
+
+                    // 2. Calculate portfolio metrics for these weights
+                    const currentReturn = calculatePortfolioExpectedReturn(returns, currentWeights);
+                    const currentVariance = calculatePortfolioVariance(currentWeights, covarianceMatrix);
+                    const currentRisk = Math.sqrt(currentVariance);
+                    const currentSharpe = calculateSharpeRatio(currentReturn, currentRisk, rfRate);
+
+                    // 3. Check if this is the best Sharpe Ratio found so far
+                    if (isFinite(currentSharpe) && currentSharpe > bestSharpe) {
+                        bestSharpe = currentSharpe;
+                        bestWeights = currentWeights;
+                        bestReturn = currentReturn;
+                        bestRisk = currentRisk;
+                    }
+                }
+
+                // 4. Display Results
+                if (bestWeights.length > 0) {
+                    const resultsContainer = document.getElementById('optimization-results-container');
+                    const weightsList = document.getElementById('optimal-weights-list');
+                    weightsList.innerHTML = ''; // Clear previous list items
+
+                    bestWeights.forEach((weight, index) => {
+                        // Update the main input fields with the optimal weights
+                        const weightInput = document.getElementById(`w${index + 1}`);
+                        if(weightInput) {
+                             weightInput.value = (weight * 100).toFixed(1); // Update input field
+                        }
+                        // Add to the results display list
+                        const li = document.createElement('li');
+                        li.textContent = `Ativo ${index + 1}: ${(weight * 100).toFixed(2)}%`;
+                        weightsList.appendChild(li);
+                    });
+
+                    document.getElementById('optimal-return').textContent = `${(bestReturn * 100).toFixed(2)}%`;
+                    document.getElementById('optimal-risk').textContent = `${(bestRisk * 100).toFixed(2)}%`;
+                    document.getElementById('optimal-sharpe').textContent = `${bestSharpe.toFixed(3)}`;
+
+                    resultsContainer.style.display = 'block';
+                    statusSpan.textContent = 'Otimização Concluída.';
+
+                     // IMPORTANT: Update the main calculation display now that weights are set
+                     updateCalculations();
+
+                } else {
+                    statusSpan.textContent = 'Não foi possível encontrar um portfólio ótimo (verifique inputs).';
+                     alert('Otimização falhou. Verifique se os riscos (DP) são maiores que zero e se os dados estão consistentes.');
+                }
+
+                optimizeButton.disabled = false; // Re-enable button
+
+            }, 50); // Small delay (50ms) for UI update
+        }
+
+
+        // Initial calculation on page load
+        document.addEventListener('DOMContentLoaded', updateCalculations);
+
+    </script>
+
+</body>
+</html>
