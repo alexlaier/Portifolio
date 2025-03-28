@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Juros Compostos</title>
+    <!-- Incluindo Chart.js via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="number"], select {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        /* Remove setas de input number (opcional) */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield; /* Firefox */
+        }
+        button {
+            padding: 12px 25px;
+            font-size: 1.1em;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #3498db;
+            color: white;
+            transition: background-color 0.3s ease;
+            grid-column: 1 / -1; /* Faz o botão ocupar toda a largura */
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .results {
+            margin-top: 30px;
+        }
+        #tempoDobrar {
+             text-align: center;
+             font-size: 1.1em;
+             margin-bottom: 25px;
+             padding: 15px;
+             background-color: #e8f6fd;
+             border-left: 5px solid #3498db;
+             border-radius: 4px;
+        }
+        #tempoDobrar strong {
+             color: #2980b9;
+        }
+        #graficoContainer {
+            margin-bottom: 30px;
+            max-width: 100%; /* Garante que não ultrapasse o container */
+            height: 400px; /* Altura fixa para o gráfico */
+        }
+        canvas {
+            max-width: 100%;
+            height: auto; /* Deixa o Chart.js controlar a altura relativa */
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: right;
+        }
+        th {
+            background-color: #ecf0f1;
+            color: #34495e;
+            text-align: center;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        td:first-child {
+            text-align: center; /* Centraliza a coluna do período */
+        }
+        .error-message {
+            color: #e74c3c;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 15px;
+        }
+        .description {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #555;
+            font-style: italic;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Calculadora de Juros Compostos</h1>
+        <p class="description">
+            Preencha os campos abaixo para simular o crescimento do seu investimento com juros compostos e aportes mensais.
+        </p>
+
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="valorInicial">Valor Inicial (R$):</label>
+                <input type="number" id="valorInicial" value="1000" min="0" step="100">
+            </div>
+            <div class="form-group">
+                <label for="aporteMensal">Aporte Mensal (R$):</label>
+                <input type="number" id="aporteMensal" value="100" min="0" step="50">
+            </div>
+            <div class="form-group">
+                <label for="taxaJuros">Taxa de Juros (%):</label>
+                <input type="number" id="taxaJuros" value="1" min="0" step="0.1">
+            </div>
+            <div class="form-group">
+                <label for="taxaPeriodo">Período da Taxa:</label>
+                <select id="taxaPeriodo">
+                    <option value="mensal" selected>Mensal</option>
+                    <option value="anual">Anual</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="duracao">Duração:</label>
+                <input type="number" id="duracao" value="10" min="1" step="1">
+            </div>
+            <div class="form-group">
+                <label for="periodoSimulacao">Período da Simulação:</label>
+                <select id="periodoSimulacao">
+                    <option value="anos" selected>Anos</option>
+                    <option value="meses">Meses</option>
+                </select>
+            </div>
+        </div>
+
+        <button id="calcularBtn">Calcular</button>
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+        <div id="resultados" class="results" style="display: none;">
+            <h2>Resultados da Simulação</h2>
+
+            <div id="tempoDobrar"></div>
+
+            <div id="graficoContainer">
+                <canvas id="graficoJuros"></canvas>
+            </div>
+
+            <h2>Tabela de Evolução</h2>
+            <div style="overflow-x:auto;"> <!-- Para rolagem horizontal em telas pequenas -->
+                <table id="tabelaResultados">
+                    <thead>
+                        <tr>
+                            <th>Período</th>
+                            <th>Saldo Inicial (R$)</th>
+                            <th>Juros (R$)</th>
+                            <th>Aporte (R$)</th>
+                            <th>Saldo Final (R$)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Linhas da tabela serão inseridas aqui via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const valorInicialInput = document.getElementById('valorInicial');
+        const aporteMensalInput = document.getElementById('aporteMensal');
+        const taxaJurosInput = document.getElementById('taxaJuros');
+        const taxaPeriodoSelect = document.getElementById('taxaPeriodo');
+        const duracaoInput = document.getElementById('duracao');
+        const periodoSimulacaoSelect = document.getElementById('periodoSimulacao');
+        const calcularBtn = document.getElementById('calcularBtn');
+        const resultadosDiv = document.getElementById('resultados');
+        const tempoDobrarDiv = document.getElementById('tempoDobrar');
+        const tabelaResultadosBody = document.querySelector('#tabelaResultados tbody');
+        const graficoCanvas = document.getElementById('graficoJuros');
+        const errorMessageDiv = document.getElementById('errorMessage');
+
+        let graficoInstance = null; // Variável para armazenar a instância do gráfico
+
+        // --- Função para formatar como moeda brasileira ---
+        function formatCurrency(value) {
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        // --- Função Principal de Cálculo ---
+        function calcularJurosCompostos() {
+            // --- Obter e Validar Entradas ---
+            const valorInicial = parseFloat(valorInicialInput.value);
+            const aporteMensal = parseFloat(aporteMensalInput.value);
+            const taxaJurosInputVal = parseFloat(taxaJurosInput.value);
+            const taxaPeriodo = taxaPeriodoSelect.value; // 'mensal' ou 'anual'
+            const duracaoInputVal = parseInt(duracaoInput.value);
+            const periodoSimulacao = periodoSimulacaoSelect.value; // 'meses' ou 'anos'
+
+            errorMessageDiv.style.display = 'none'; // Esconde mensagem de erro inicial
+            errorMessageDiv.textContent = '';
+
+            if (isNaN(valorInicial) || valorInicial < 0 ||
+                isNaN(aporteMensal) || aporteMensal < 0 ||
+                isNaN(taxaJurosInputVal) || taxaJurosInputVal < 0 ||
+                isNaN(duracaoInputVal) || duracaoInputVal <= 0) {
+                errorMessageDiv.textContent = 'Por favor, insira valores válidos e não negativos (duração > 0).';
+                errorMessageDiv.style.display = 'block';
+                resultadosDiv.style.display = 'none'; // Esconde resultados antigos
+                return; // Para a execução se houver erro
+            }
+
+            // --- Normalização para Meses ---
+            // Taxa de juros mensal
+            let taxaJurosMensal;
+            if (taxaPeriodo === 'anual') {
+                // Converte taxa anual para mensal (considerando juros compostos na conversão)
+                taxaJurosMensal = Math.pow(1 + taxaJurosInputVal / 100, 1 / 12) - 1;
+            } else {
+                taxaJurosMensal = taxaJurosInputVal / 100;
+            }
+
+            // Duração total em meses
+            const duracaoTotalMeses = (periodoSimulacao === 'anos') ? duracaoInputVal * 12 : duracaoInputVal;
+
+            // --- Cálculo do Tempo para Dobrar (baseado na taxa mensal, ignora aportes) ---
+            let tempoDobrarMeses = Infinity; // Valor inicial caso a taxa seja 0
+            if (taxaJurosMensal > 0) {
+                 // Fórmula: tempo = ln(2) / ln(1 + taxa)
+                 tempoDobrarMeses = Math.log(2) / Math.log(1 + taxaJurosMensal);
+            }
+
+            let tempoDobrarTexto = `Com a taxa de ${taxaJurosInputVal.toFixed(2)}% ${taxaPeriodo === 'anual' ? 'ao ano' : 'ao mês'}, `;
+            if (tempoDobrarMeses === Infinity) {
+                tempoDobrarTexto += "o capital inicial nunca dobrará (taxa de juros zero ou negativa).";
+            } else {
+                const anosDobrar = Math.floor(tempoDobrarMeses / 12);
+                const mesesRestantesDobrar = Math.ceil(tempoDobrarMeses % 12); // Arredonda para cima o mês
+                tempoDobrarTexto += "o capital inicial (sem aportes) dobraria em aproximadamente ";
+                if (anosDobrar > 0) {
+                    tempoDobrarTexto += `${anosDobrar} ano${anosDobrar > 1 ? 's' : ''}`;
+                    if (mesesRestantesDobrar > 0) {
+                         tempoDobrarTexto += ` e ${mesesRestantesDobrar} mes${mesesRestantesDobrar > 1 ? 'es' : ''}`;
+                    }
+                } else {
+                    tempoDobrarTexto += `${mesesRestantesDobrar} mes${mesesRestantesDobrar > 1 ? 'es' : ''}`;
+                }
+                tempoDobrarTexto += ".";
+            }
+             tempoDobrarDiv.innerHTML = `<strong>Tempo Estimado para Dobrar o Capital Inicial:</strong><br>${tempoDobrarTexto}`;
+
+
+            // --- Simulação Mês a Mês ---
+            let saldoAtual = valorInicial;
+            let totalInvestido = valorInicial;
+            let totalJuros = 0;
+            const dadosTabela = [];
+            const dadosGrafico = {
+                labels: [], // Períodos (meses)
+                saldosFinais: [],
+                valoresInvestidos: [],
+                jurosAcumulados: [] // Opcional para o gráfico
+            };
+
+            // Adiciona ponto inicial (mês 0) para o gráfico
+            dadosGrafico.labels.push(0);
+            dadosGrafico.saldosFinais.push(valorInicial);
+            dadosGrafico.valoresInvestidos.push(valorInicial);
+            dadosGrafico.jurosAcumulados.push(0);
+
+
+            for (let mes = 1; mes <= duracaoTotalMeses; mes++) {
+                const saldoInicialPeriodo = saldoAtual;
+                const jurosMes = saldoAtual * taxaJurosMensal;
+                saldoAtual += jurosMes + aporteMensal; // Aplica juros e depois o aporte
+                totalJuros += jurosMes;
+                totalInvestido += aporteMensal;
+
+                // Guarda dados para a tabela
+                dadosTabela.push({
+                    periodo: mes,
+                    saldoInicial: saldoInicialPeriodo,
+                    juros: jurosMes,
+                    aporte: aporteMensal,
+                    saldoFinal: saldoAtual
+                });
+
+                // Guarda dados para o gráfico
+                dadosGrafico.labels.push(mes);
+                dadosGrafico.saldosFinais.push(saldoAtual);
+                dadosGrafico.valoresInvestidos.push(totalInvestido); // Valor total que saiu do bolso
+                dadosGrafico.jurosAcumulados.push(totalJuros);
+            }
+
+            // --- Exibir Resultados ---
+            resultadosDiv.style.display = 'block'; // Mostra a seção de resultados
+
+            // --- Preencher Tabela ---
+            tabelaResultadosBody.innerHTML = ''; // Limpa tabela anterior
+            dadosTabela.forEach(item => {
+                const row = tabelaResultadosBody.insertRow();
+                row.innerHTML = `
+                    <td>${item.periodo}</td>
+                    <td>${formatCurrency(item.saldoInicial)}</td>
+                    <td>${formatCurrency(item.juros)}</td>
+                    <td>${formatCurrency(item.aporte)}</td>
+                    <td>${formatCurrency(item.saldoFinal)}</td>
+                `;
+            });
+
+            // --- Criar/Atualizar Gráfico ---
+            if (graficoInstance) {
+                graficoInstance.destroy(); // Destroi gráfico anterior se existir
+            }
+
+            const ctx = graficoCanvas.getContext('2d');
+            graficoInstance = new Chart(ctx, {
+                type: 'line', // Tipo de gráfico (linha)
+                data: {
+                    labels: dadosGrafico.labels.map(mes => `Mês ${mes}`), // Rótulos do eixo X
+                    datasets: [
+                        {
+                            label: 'Saldo Total (R$)',
+                            data: dadosGrafico.saldosFinais,
+                            borderColor: 'rgb(54, 162, 235)', // Azul
+                            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                            tension: 0.1, // Suaviza a linha
+                            fill: true // Preenche a área abaixo da linha
+                        },
+                        {
+                            label: 'Total Investido (R$)',
+                            data: dadosGrafico.valoresInvestidos,
+                            borderColor: 'rgb(75, 192, 192)', // Verde/Azul-piscina
+                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                            tension: 0.1,
+                            fill: false // Não preenche esta área
+                        },
+                         {
+                            label: 'Total Juros Ganhos (R$)',
+                            data: dadosGrafico.jurosAcumulados,
+                            borderColor: 'rgb(255, 159, 64)', // Laranja
+                            backgroundColor: 'rgba(255, 159, 64, 0.1)',
+                            tension: 0.1,
+                            fill: false // Não preenche esta área
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, // Torna o gráfico responsivo
+                    maintainAspectRatio: false, // Permite controlar a altura independentemente da largura
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Evolução do Investimento ao Longo do Tempo',
+                            font: { size: 16 }
+                        },
+                         tooltip: {
+                              callbacks: {
+                                   label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += formatCurrency(context.parsed.y);
+                                        }
+                                        return label;
+                                   }
+                              }
+                         }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Tempo (Meses)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Valor (R$)'
+                            },
+                            ticks: {
+                                // Formata os ticks do eixo Y como moeda
+                                callback: function(value, index, values) {
+                                    return formatCurrency(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- Event Listener ---
+        calcularBtn.addEventListener('click', calcularJurosCompostos);
+
+        // --- Executa um cálculo inicial ao carregar (opcional) ---
+        // calcularJurosCompostos();
+
+    </script>
+</body>
+</html>
