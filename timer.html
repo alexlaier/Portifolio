@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timer & Cronômetro</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 30px 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        h1 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            font-size: 1.8em;
+        }
+
+        .mode-selector {
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .mode-selector label {
+            padding: 8px 15px;
+            border: 1px solid #bdc3c7;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+            background-color: #ecf0f1;
+            color: #7f8c8d;
+            font-weight: 500;
+        }
+
+        .mode-selector input[type="radio"] {
+            display: none;
+        }
+
+        .mode-selector input[type="radio"]:checked + label {
+            background-color: #3498db;
+            color: #ffffff;
+            border-color: #3498db;
+        }
+
+
+        .timer-inputs {
+            /* display: flex; Será controlado pelo JS */
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .timer-inputs div {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .timer-inputs label {
+            font-size: 0.8em;
+            margin-bottom: 3px;
+            color: #555;
+        }
+
+        .timer-inputs input {
+            width: 55px;
+            padding: 8px;
+            font-size: 1.1em;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            -moz-appearance: textfield;
+        }
+
+        .timer-inputs input::-webkit-outer-spin-button,
+        .timer-inputs input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+
+        #display {
+            font-size: 3.5em;
+            margin-bottom: 25px;
+            font-family: 'Courier New', Courier, monospace;
+            color: #34495e;
+            background-color: #ecf0f1;
+            padding: 15px 10px;
+            border-radius: 8px;
+            display: inline-block;
+            min-width: 250px;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .controls button {
+            padding: 12px 20px;
+            margin: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            min-width: 100px;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        .controls button:active {
+            transform: scale(0.98);
+        }
+
+        #startBtn { background-color: #2ecc71; }
+        #startBtn:hover { background-color: #27ae60; }
+
+        #pauseBtn { background-color: #f39c12; }
+        #pauseBtn:hover { background-color: #e67e22; }
+
+        #resetBtn { background-color: #e74c3c; }
+        #resetBtn:hover { background-color: #c0392b; }
+
+        #pauseBtn, #resetBtn {
+            display: none;
+        }
+
+        /* Estilo para quando o alarme toca */
+        .alarm-ringing {
+             /* Pisca continuamente */
+             animation: blink 0.5s linear infinite;
+        }
+
+        @keyframes blink {
+            50% { background-color: #e74c3c; color: white; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Timer & Cronômetro</h1>
+
+        <div class="mode-selector">
+            <input type="radio" id="modeTimer" name="mode" value="timer" checked>
+            <label for="modeTimer">Timer</label>
+
+            <input type="radio" id="modeStopwatch" name="mode" value="stopwatch">
+            <label for="modeStopwatch">Cronômetro</label>
+        </div>
+
+        <div id="timerInputs" class="timer-inputs">
+             <div>
+                 <label for="hours">Horas</label>
+                 <input type="number" id="hours" min="0" max="99" value="0">
+             </div>
+             <div>
+                 <label for="minutes">Min</label>
+                 <input type="number" id="minutes" min="0" max="59" value="5">
+             </div>
+             <div>
+                 <label for="seconds">Seg</label>
+                 <input type="number" id="seconds" min="0" max="59" value="0">
+             </div>
+        </div>
+
+        <div id="display">00:05:00</div>
+
+        <div class="controls">
+            <button id="startBtn">Iniciar</button>
+            <button id="pauseBtn">Pausar</button>
+            <button id="resetBtn">Resetar</button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Elementos DOM ---
+        const display = document.getElementById('display');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const modeRadios = document.querySelectorAll('input[name="mode"]');
+        const timerInputsDiv = document.getElementById('timerInputs');
+        const hoursInput = document.getElementById('hours');
+        const minutesInput = document.getElementById('minutes');
+        const secondsInput = document.getElementById('seconds');
+        const displayContainer = document.getElementById('display');
+
+        // --- Web Audio API Context ---
+        let audioCtx = null;
+        let activeOscillator = null; // Guarda a referência do oscilador ativo
+
+        // --- Estado ---
+        let mode = 'timer';
+        let intervalId = null;
+        let isRunning = false;
+        let isBeeping = false; // Controla se o beep está ativo
+
+        // Cronômetro
+        let startTime = 0;
+        let elapsedTime = 0;
+
+        // Timer
+        let timerDuration = 0;
+        let timerEndTime = 0;
+
+        // --- Funções Auxiliares ---
+
+        function formatTime(ms) {
+            const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            const hStr = String(hours).padStart(2, '0');
+            const mStr = String(minutes).padStart(2, '0');
+            const sStr = String(seconds).padStart(2, '0');
+
+            return `${hStr}:${mStr}:${sStr}`;
+        }
+
+        function updateDisplay() {
+            if (mode === 'stopwatch') {
+                const currentElapsedTime = isRunning ? Date.now() - startTime + elapsedTime : elapsedTime;
+                display.textContent = formatTime(currentElapsedTime);
+            } else { // mode === 'timer'
+                if (isRunning) {
+                    const remainingTime = timerEndTime - Date.now();
+                    display.textContent = formatTime(remainingTime);
+
+                    if (remainingTime <= 0 && !isBeeping) { // Verifica se já não está beeping
+                        pauseClock(); // Pausa o intervalo
+                        display.textContent = "00:00:00";
+                        playBeep(); // Toca o beep continuamente
+                    }
+                } else if (!isBeeping) { // Se não estiver rodando E não estiver beeping
+                     const displayTime = timerDuration - elapsedTime;
+                     display.textContent = formatTime(displayTime);
+                }
+                // Se estiver beeping, o display fica 00:00:00
+            }
+        }
+
+        // Toca um beep contínuo usando Web Audio API
+        function playBeep() {
+            if (isBeeping || !audioCtx) return; // Já está tocando ou audioCtx não inicializado
+
+            // Para qualquer oscilador anterior (segurança)
+            stopBeepSoundOnly();
+
+            try {
+                 // Se suspenso, tenta resumir
+                 if (audioCtx.state === 'suspended') {
+                     audioCtx.resume();
+                 }
+
+                activeOscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                activeOscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                activeOscillator.type = 'sine';
+                activeOscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); // Volume
+
+                activeOscillator.start(audioCtx.currentTime); // Inicia e NÃO para
+                isBeeping = true;
+
+                // Efeito visual de piscar
+                displayContainer.classList.add('alarm-ringing');
+
+            } catch (e) {
+                console.error("Erro ao tocar beep com Web Audio API:", e);
+                isBeeping = false; // Garante que não fique em estado de beep falso
+            }
+        }
+
+        // Para apenas o som do oscilador
+        function stopBeepSoundOnly() {
+             if (activeOscillator) {
+                try {
+                    activeOscillator.stop();
+                } catch (e) {
+                    console.warn("Could not stop oscillator:", e);
+                }
+                activeOscillator = null;
+            }
+        }
+
+        // Para o som E o efeito visual
+        function stopBeep() {
+            stopBeepSoundOnly(); // Para o som
+            isBeeping = false; // Atualiza o estado
+            displayContainer.classList.remove('alarm-ringing'); // Para o visual
+        }
+
+        // --- Funções de Controle ---
+
+        function startClock() {
+            // Inicializa/Resume o AudioContext com um gesto do usuário
+             if (!audioCtx || audioCtx.state === 'closed') {
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {
+                    console.error("Web Audio API não suportada ou falhou ao iniciar:", e);
+                    alert("Não foi possível inicializar o áudio.");
+                    return; // Aborta se o áudio não puder ser iniciado
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            // Para qualquer beep anterior antes de iniciar
+            if (isBeeping) {
+                stopBeep();
+            }
+            if (isRunning) return; // Se já estiver rodando, não faz nada
+
+
+            if (mode === 'stopwatch') {
+                startTime = Date.now() - elapsedTime;
+                intervalId = setInterval(updateDisplay, 50);
+                isRunning = true;
+            } else { // mode === 'timer'
+                // Pega a duração dos inputs APENAS se não estiver retomando ou se resetado
+                 // Ou se o timer terminou (isBeeping foi tratado acima)
+                if (elapsedTime === 0) {
+                    const h = parseInt(hoursInput.value) || 0;
+                    const m = parseInt(minutesInput.value) || 0;
+                    const s = parseInt(secondsInput.value) || 0;
+                    timerDuration = (h * 3600 + m * 60 + s) * 1000;
+                }
+
+                 // Se o tempo restante for zero ou menos (após um reset ou config para 0)
+                if (timerDuration - elapsedTime <= 0) {
+                     alert("Defina um tempo maior que zero para o Timer.");
+                     resetClock();
+                     return;
+                }
+
+                const remainingDuration = timerDuration - elapsedTime;
+                timerEndTime = Date.now() + remainingDuration;
+
+                intervalId = setInterval(updateDisplay, 100);
+                isRunning = true;
+                disableTimerInputs(true);
+            }
+
+            // Atualiza UI dos botões
+            startBtn.style.display = 'none';
+            pauseBtn.style.display = 'inline-block';
+            resetBtn.style.display = 'inline-block';
+        }
+
+        function pauseClock() {
+            if (!isRunning) return; // Não faz nada se já pausado ou parado
+
+            clearInterval(intervalId);
+            isRunning = false;
+            const now = Date.now();
+
+            if (mode === 'stopwatch') {
+                elapsedTime = now - startTime;
+            } else { // mode === 'timer'
+                 const remainingTime = Math.max(0, timerEndTime - now);
+                 elapsedTime = timerDuration - remainingTime;
+                 disableTimerInputs(false); // Reabilita inputs ao pausar timer
+            }
+
+            // Atualiza UI dos botões
+            startBtn.style.display = 'inline-block';
+            pauseBtn.style.display = 'none';
+        }
+
+        function resetClock() {
+            // Para o intervalo se estiver rodando
+            if (isRunning) {
+                clearInterval(intervalId);
+                isRunning = false;
+            }
+             // Para o beep se estiver tocando
+            if (isBeeping) {
+                stopBeep();
+            }
+
+            elapsedTime = 0;
+            startTime = 0;
+
+
+            if (mode === 'stopwatch') {
+                display.textContent = "00:00:00";
+            } else { // mode === 'timer'
+                 const h = parseInt(hoursInput.value) || 0;
+                 const m = parseInt(minutesInput.value) || 0;
+                 const s = parseInt(secondsInput.value) || 0;
+                 timerDuration = (h * 3600 + m * 60 + s) * 1000;
+                 display.textContent = formatTime(timerDuration);
+                 disableTimerInputs(false); // Garante que inputs estejam habilitados
+            }
+
+            // Reseta UI dos botões
+            startBtn.style.display = 'inline-block';
+            pauseBtn.style.display = 'none';
+            resetBtn.style.display = 'none';
+        }
+
+
+        // --- Mudança de Modo ---
+        function handleModeChange(event) {
+            const newMode = event.target.value;
+            if (newMode === mode) return;
+
+             // Para o beep antes de mudar e resetar
+            if (isBeeping) {
+                stopBeep();
+            }
+
+            mode = newMode;
+            resetClock(); // Reseta tudo ao trocar de modo
+
+            if (mode === 'timer') {
+                timerInputsDiv.style.display = 'flex';
+                 const h = parseInt(hoursInput.value) || 0;
+                 const m = parseInt(minutesInput.value) || 0;
+                 const s = parseInt(secondsInput.value) || 0;
+                 timerDuration = (h * 3600 + m * 60 + s) * 1000;
+                 display.textContent = formatTime(timerDuration);
+                 disableTimerInputs(false);
+            } else { // mode === 'stopwatch'
+                timerInputsDiv.style.display = 'none';
+                display.textContent = "00:00:00";
+            }
+        }
+
+        function disableTimerInputs(disable) {
+            hoursInput.disabled = disable;
+            minutesInput.disabled = disable;
+            secondsInput.disabled = disable;
+        }
+
+
+        // --- Event Listeners ---
+        startBtn.addEventListener('click', startClock);
+        pauseBtn.addEventListener('click', pauseClock);
+        resetBtn.addEventListener('click', resetClock);
+
+        modeRadios.forEach(radio => {
+            radio.addEventListener('change', handleModeChange);
+        });
+
+        [hoursInput, minutesInput, secondsInput].forEach(input => {
+            input.addEventListener('input', (e) => {
+                let maxVal = input.id === 'hours' ? 99 : 59;
+                let val = parseInt(e.target.value);
+
+                if (isNaN(val) || val < 0) {
+                    e.target.value = 0;
+                } else if (val > maxVal) {
+                    e.target.value = maxVal;
+                } else {
+                     e.target.value = val;
+                }
+
+                if (mode === 'timer' && !isRunning && !isBeeping) { // Atualiza apenas se não estiver rodando NEM beeping
+                     const h = parseInt(hoursInput.value) || 0;
+                     const m = parseInt(minutesInput.value) || 0;
+                     const s = parseInt(secondsInput.value) || 0;
+                     timerDuration = (h * 3600 + m * 60 + s) * 1000;
+                     display.textContent = formatTime(timerDuration);
+                     elapsedTime = 0;
+                }
+            });
+             input.addEventListener('blur', (e) => {
+                  if (!e.target.value) {
+                      e.target.value = 0;
+                  }
+             });
+        });
+
+
+        // --- Inicialização ---
+        function initialize() {
+            if (document.getElementById('modeTimer').checked) {
+                 mode = 'timer';
+                 timerInputsDiv.style.display = 'flex';
+                 const h = parseInt(hoursInput.value) || 0;
+                 const m = parseInt(minutesInput.value) || 0;
+                 const s = parseInt(secondsInput.value) || 0;
+                 timerDuration = (h * 3600 + m * 60 + s) * 1000;
+                 display.textContent = formatTime(timerDuration);
+                 disableTimerInputs(false);
+            } else {
+                 mode = 'stopwatch';
+                 timerInputsDiv.style.display = 'none';
+                 display.textContent = "00:00:00";
+            }
+             resetBtn.style.display = 'none';
+             pauseBtn.style.display = 'none';
+             startBtn.style.display = 'inline-block';
+        }
+
+        initialize();
+
+    </script>
+
+</body>
+</html>
