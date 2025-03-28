@@ -15,3 +15,6 @@ Calculadora de Juros compostos - in a single html file:
 
 Timer Cronômetro - in a single html file:
 [Link](https://alexlaier.github.io/Portifolio/timer.html)
+
+Audio Analyzer - Compute BPM and Key of a song - in a single html file:
+[Link](https://alexlaier.github.io/Portifolio/audio_analizer.html)
