@@ -42,14 +42,13 @@
     </div>
 </div>
 
-<!-- 1. Carrega a biblioteca aubio.js PRIMEIRO -->
-<script src="https://cdn.jsdelivr.net/npm/aubiojs@0.2.1/build/aubio.min.js"></script>
 
 <!-- 2. Executa o SEU script DEPOIS que a biblioteca foi carregada -->
-<script>
+<script type="module">
     // --- Todo o código JavaScript que estava aqui antes ---
     // (Desde 'console.log('Script iniciado.');' até o final)
-
+	import aubio from './aubio.esm.js';
+	 
     console.log('Script iniciado.');
 
     // --- Elementos da UI ---
@@ -95,7 +94,7 @@
     // AGORA, quando esta linha executar, o script externo JÁ FOI CARREGADO
     // e a função global 'Aubio' DEVE estar definida.
     console.log('Chamando Aubio() para carregar WASM...');
-    Aubio().then(aubio => {
+    aubio().then(aubio => {
         aubioInstance = aubio;
         console.log('Aubio.js (WASM) carregado com sucesso.');
         statusDiv.textContent = 'Biblioteca pronta. Escolha um arquivo MP3.';
@@ -281,7 +280,7 @@
                 currentPosition += hopSize;
             }
             bpm = tempo.getBpm();
-            tempo.free();
+            //tempo.free();
             console.log(`BPM bruto detectado: ${bpm}`);
             bpmResultSpan.textContent = bpm > 0 ? bpm.toFixed(1) : 'Não detectado';
         } catch(err) {
@@ -320,7 +319,7 @@
                 currentPositionPitch += pitchHopSize;
                 framesProcessed++;
             }
-            pitch.free();
+            //pitch.free();
             console.log(`Frames processados para pitch: ${framesProcessed}`);
 
             let maxCount = 0;
