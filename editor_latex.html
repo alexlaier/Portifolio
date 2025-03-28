@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor/Visualizador LaTeX com Exemplos</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #f0f0f0;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 15px 0;
+            color: #333;
+            font-size: 1.5em;
+            flex-shrink: 0; /* Impede que o título encolha */
+        }
+
+        .container {
+            display: flex;
+            flex-grow: 1;
+            padding: 10px;
+            gap: 10px; /* Espaço entre as colunas */
+            min-height: 0; /* Necessário para flex-grow funcionar corretamente em alguns browsers */
+        }
+
+        .editor-pane, .preview-pane {
+            flex: 1; /* Ocupa metade do espaço */
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Evita que o conteúdo vaze */
+        }
+
+        .pane-title {
+            background-color: #e0e0e0;
+            padding: 8px 12px;
+            font-weight: bold;
+            border-bottom: 1px solid #ccc;
+            color: #444;
+            flex-shrink: 0; /* Não encolher o título */
+        }
+
+        /* --- Seção de Exemplos --- */
+        #examples-menu {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+            flex-shrink: 0; /* Não encolher o menu */
+        }
+
+        #example-buttons {
+            display: flex;
+            flex-wrap: wrap; /* Quebra linha se não couber */
+            gap: 5px; /* Espaço entre botões */
+        }
+
+        button.example-btn {
+            padding: 4px 8px;
+            font-size: 0.8em;
+            background-color: #f8f8f8;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        button.example-btn:hover {
+            background-color: #e7e7e7;
+        }
+        /* --- Fim da Seção de Exemplos --- */
+
+
+        #latex-input {
+            flex-grow: 1;
+            border: none;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 1rem;
+            line-height: 1.5;
+            resize: none; /* Desabilita redimensionamento manual */
+            outline: none; /* Remove borda de foco */
+            box-sizing: border-box; /* Inclui padding na largura/altura */
+            width: 100%; /* Garante que o textarea ocupe toda a largura do pai */
+            min-height: 100px; /* Altura mínima para o textarea */
+        }
+
+        #preview-output {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto; /* Adiciona scroll se necessário */
+            line-height: 1.6;
+            box-sizing: border-box;
+            width: 100%;
+            word-wrap: break-word; /* Quebra palavras longas */
+        }
+
+         /* Estilo para mensagens de erro ou status */
+         #status {
+            padding: 5px 12px;
+            font-size: 0.85em;
+            color: #666;
+            text-align: center;
+            min-height: 1.5em; /* Reserva espaço */
+            flex-shrink: 0;
+         }
+
+         /* Styling MathJax errors */
+        .MathJax_Error {
+            color: #CC0000 !important;
+            font-style: italic;
+            font-size: 90% !important;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 10px;
+            font-size: 0.8em;
+            color: #777;
+            background-color: #e0e0e0;
+            border-top: 1px solid #ccc;
+            flex-shrink: 0;
+        }
+
+    </style>
+
+    <!-- Configuração e carregamento do MathJax -->
+    <script>
+      MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          displayMath: [['$$', '$$'], ['\\[', '\\]']],
+          processEscapes: true,
+          tags: 'ams',
+           packages: {'[+]': ['input/tex-base', 'output/chtml', 'ui/safe', 'loader', 'core', 'startup', 'adaptors/liteDOM', 'input/tex/ams', 'input/tex/newcommand', 'input/tex/configmacros']}
+        },
+        svg: {
+          fontCache: 'global'
+        },
+        chtml: {
+            fontURL: 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2'
+        },
+        options: {
+          skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+          ignoreHtmlClass: 'tex2jax_ignore',
+          processHtmlClass: 'tex2jax_process'
+        },
+        startup: {
+            ready: () => {
+                console.log('MathJax Ready!');
+                MathJax.startup.defaultReady();
+                // Chama a função de atualização inicial e popula os botões
+                populateExampleButtons(); // << Adicionado aqui
+                updatePreview();
+            }
+        }
+      };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+</head>
+<body>
+
+    <h1>Editor/Visualizador LaTeX com Exemplos</h1>
+
+    <div class="container">
+        <div class="editor-pane">
+            <!-- Menu de Exemplos -->
+            <div id="examples-menu">
+                <div class="pane-title" style="border: none; padding: 0 0 5px 0;">Inserir Exemplo:</div>
+                <div id="example-buttons">
+                    <!-- Botões serão adicionados aqui pelo JavaScript -->
+                </div>
+            </div>
+            <!-- Fim do Menu de Exemplos -->
+
+            <div class="pane-title" style="border-radius: 0;">Entrada LaTeX</div>
+            <textarea id="latex-input" spellcheck="false" placeholder="Digite seu código LaTeX aqui... Ex: $E = mc^2$ ou \frac{a}{b}">
+
+Clique nos botões acima para inserir exemplos comuns ou digite seu próprio código.
+
+Exemplo inicial: $ \cos^2 \theta + \sin^2 \theta = 1 $
+
+\[
+    \mathcal{L} \{ f(t) \} = F(s) = \int_0^\infty e^{-st} f(t) dt
+\]
+
+            </textarea>
+        </div>
+        <div class="preview-pane">
+            <div class="pane-title">Pré-visualização (Renderizado por MathJax)</div>
+            <div id="preview-output">
+                <!-- A pré-visualização será renderizada aqui -->
+            </div>
+             <div id="status"></div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Renderização de matemática por <a href="https://www.mathjax.org/" target="_blank">MathJax</a>. Isto NÃO é um compilador LaTeX completo para PDF.
+    </div>
+
+    <script>
+        const latexInput = document.getElementById('latex-input');
+        const previewOutput = document.getElementById('preview-output');
+        const statusDiv = document.getElementById('status');
+        const exampleButtonsContainer = document.getElementById('example-buttons'); // Container dos botões
+        let renderTimeout;
+
+        // --- Exemplos de LaTeX ---
+        const latexExamples = [
+            { label: 'Fração', code: '\\frac{num}{den}' },
+            { label: 'Raiz Quad.', code: '\\sqrt{x}' },
+            { label: 'Raiz N', code: '\\sqrt[n]{x}' },
+            { label: 'Expoente', code: 'x^{exp}' },
+            { label: 'Índice', code: 'x_{sub}' },
+            { label: 'Integral', code: '\\int_{a}^{b} f(x) \\, dx' },
+            { label: 'Somatório', code: '\\sum_{n=1}^{\\infty} a_n' },
+            { label: 'Produtório', code: '\\prod_{n=1}^{\\infty} a_n' },
+            { label: 'Limite', code: '\\lim_{x \\to c} f(x)' },
+            { label: 'Vetor', code: '\\vec{v}' },
+            { label: 'Letra Grega α', code: '\\alpha' },
+            { label: 'Letra Grega β', code: '\\beta' },
+            { label: 'Letra Grega π', code: '\\pi' },
+            { label: 'Símbolo ∞', code: '\\infty' },
+            { label: 'Símbolo ±', code: '\\pm' },
+            { label: 'Símbolo ≠', code: '\\neq' },
+            { label: 'Símbolo ≈', code: '\\approx' },
+            { label: 'Matriz 2x2', code: '\\begin{pmatrix}\n a & b \\\\\n c & d \n\\end{pmatrix}' },
+            { label: 'Display Math $$', code: '$$ E = mc^2 $$'},
+            { label: 'Inline Math $', code: '$ ax^2 + bx + c $'}
+        ];
+
+        // --- Função para popular os botões de exemplo ---
+        function populateExampleButtons() {
+            latexExamples.forEach(example => {
+                const button = document.createElement('button');
+                button.textContent = example.label;
+                button.className = 'example-btn';
+                button.title = `Inserir: ${example.code}`; // Tooltip
+                button.addEventListener('click', () => {
+                    insertLatex(example.code);
+                });
+                exampleButtonsContainer.appendChild(button);
+            });
+        }
+
+        // --- Função para inserir texto na posição do cursor ---
+        function insertLatex(code) {
+            const startPos = latexInput.selectionStart;
+            const endPos = latexInput.selectionEnd;
+            const currentValue = latexInput.value;
+
+            const newValue = currentValue.substring(0, startPos) +
+                             code +
+                             currentValue.substring(endPos);
+
+            latexInput.value = newValue;
+
+            // Reposiciona o cursor após o texto inserido
+            const newCursorPos = startPos + code.length;
+            latexInput.selectionStart = newCursorPos;
+            latexInput.selectionEnd = newCursorPos;
+
+            // Foca na área de texto novamente
+            latexInput.focus();
+
+            // Dispara o evento 'input' para acionar a atualização da preview (com debounce)
+            latexInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+
+        // --- Função de Atualização da Preview ---
+        function updatePreview() {
+            const latexCode = latexInput.value;
+            previewOutput.innerHTML = latexCode
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/\n/g, "<br>");
+
+            statusDiv.textContent = 'Renderizando...';
+            if (window.MathJax && MathJax.typesetPromise) {
+                MathJax.texReset();
+                MathJax.typesetClear([previewOutput]);
+                MathJax.typesetPromise([previewOutput])
+                    .then(() => {
+                        statusDiv.textContent = 'Pré-visualização atualizada.';
+                    }).catch((err) => {
+                        console.error('MathJax Error:', err);
+                        statusDiv.textContent = 'Erro ao renderizar com MathJax.';
+                    });
+            } else {
+                 statusDiv.textContent = 'MathJax não está pronto...';
+                 console.warn('MathJax object or typesetPromise not available yet.');
+            }
+        }
+
+        // --- Event Listeners ---
+        latexInput.addEventListener('input', () => {
+            clearTimeout(renderTimeout);
+            statusDiv.textContent = 'Digitando...';
+            renderTimeout = setTimeout(updatePreview, 500); // Atraso de 500ms
+        });
+
+        // --- Inicialização ---
+        // A população dos botões e a primeira atualização agora são chamadas
+        // dentro do MathJax.startup.ready para garantir que MathJax esteja carregado.
+        if (!window.MathJax) {
+             statusDiv.textContent = 'Aguardando MathJax...';
+        }
+
+    </script>
+
+</body>
+</html>
