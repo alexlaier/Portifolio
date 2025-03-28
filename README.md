@@ -11,3 +11,7 @@ Bpm Tap - compute the bpm of a song by tapping tempo in a single html file:
 
 Calculadora de Juros compostos - in a single html file:
 [Link](https://alexlaier.github.io/Portifolio/calculadora_juros_compostos.html)
+
+
+Timer Cronômetro - in a single html file:
+[Link](https://alexlaier.github.io/Portifolio/timer.html)
