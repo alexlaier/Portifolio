@@ -1,4 +1,4 @@
-# Portifolio Alex Laier
+# Portifólio Alex Laier
 
 
 Stock Portifolio optimization in a single html file:
