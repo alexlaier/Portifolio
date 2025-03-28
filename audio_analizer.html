@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisador de MP3 (BPM e Tom) v3</title>
+    <style>
+        /* (Estilos CSS permanecem os mesmos - omitidos por brevidade) */
+        body { font-family: sans-serif; padding: 20px; background-color: #f4f4f4; display: flex; flex-direction: column; align-items: center; }
+        #container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; max-width: 500px; }
+        h1 { color: #333; margin-bottom: 20px; }
+        input[type="file"] { display: block; margin: 0 auto 20px auto; padding: 10px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; }
+        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        #status { margin-top: 15px; font-style: italic; color: #666; min-height: 20px; font-weight: bold; }
+        #results { margin-top: 20px; padding: 15px; border: 1px dashed #ddd; border-radius: 4px; background-color: #e9e9e9; display: none; /* Oculto inicialmente */ text-align: left; }
+        #results p { margin: 8px 0; font-size: 1.1em; }
+        #results strong { color: #0056b3; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; margin-left: 10px; vertical-align: middle; display: none; /* Oculto inicialmente */ }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        small { display: block; margin-top: 10px; color: #777; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <h1>Analisador de Música MP3</h1>
+    <p>Envie um arquivo MP3 para calcular o BPM e estimar a nota predominante.</p>
+
+    <input type="file" id="mp3File" accept=".mp3" disabled> <!-- Desabilitado inicialmente -->
+    <button id="analyzeButton" disabled>Analisar Arquivo</button> <!-- Botão para iniciar análise -->
+
+    <div id="status">Inicializando...</div>
+    <div class="loader" id="loader"></div>
+
+    <div id="results">
+        <h2>Resultados da Análise:</h2>
+        <p>BPM Estimado: <strong id="bpmResult">-</strong></p>
+        <p>Nota Predominante Estimada: <strong id="keyResult">-</strong></p>
+        <small>(A detecção da nota/tom é uma estimativa simplificada e pode não representar a chave musical harmônica completa.)</small>
+    </div>
+</div>
+
+<!-- 1. Carrega a biblioteca aubio.js PRIMEIRO -->
+<script src="https://cdn.jsdelivr.net/npm/aubiojs@0.2.1/build/aubio.min.js"></script>
+
+<!-- 2. Executa o SEU script DEPOIS que a biblioteca foi carregada -->
+<script>
+    // --- Todo o código JavaScript que estava aqui antes ---
+    // (Desde 'console.log('Script iniciado.');' até o final)
+
+    console.log('Script iniciado.');
+
+    // --- Elementos da UI ---
+    const fileInput = document.getElementById('mp3File');
+    const analyzeButton = document.getElementById('analyzeButton');
+    const statusDiv = document.getElementById('status');
+    const resultsDiv = document.getElementById('results');
+    const bpmResultSpan = document.getElementById('bpmResult');
+    const keyResultSpan = document.getElementById('keyResult');
+    const loader = document.getElementById('loader');
+
+    // --- Constantes e Variáveis Globais ---
+    let audioContext;
+    let aubioInstance;
+    let selectedFile = null; // Armazena o arquivo selecionado
+
+    const noteStrings = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+    // --- Inicialização ---
+    window.AudioContext = window.AudioContext || window.webkitAudioContext;
+
+    function initializeAudio() {
+        try {
+            if (!audioContext) { // Evita criar múltiplos contextos
+                 audioContext = new AudioContext();
+                 console.log('AudioContext criado.');
+                 // Verifica o estado inicial - pode ser 'suspended'
+                 if (audioContext.state === 'suspended') {
+                    console.log('AudioContext está suspenso. Precisa de interação para resumir.');
+                 }
+            }
+            return true;
+        } catch (e) {
+            console.error("Web Audio API não é suportada ou falhou ao inicializar:", e);
+            statusDiv.textContent = 'Erro: Seu navegador não suporta a Web Audio API necessária.';
+            fileInput.disabled = true;
+            analyzeButton.disabled = true;
+            return false;
+        }
+    }
+
+    // Carrega o módulo Aubio.js
+    // AGORA, quando esta linha executar, o script externo JÁ FOI CARREGADO
+    // e a função global 'Aubio' DEVE estar definida.
+    console.log('Chamando Aubio() para carregar WASM...');
+    Aubio().then(aubio => {
+        aubioInstance = aubio;
+        console.log('Aubio.js (WASM) carregado com sucesso.');
+        statusDiv.textContent = 'Biblioteca pronta. Escolha um arquivo MP3.';
+        fileInput.disabled = false; // Habilita input de arquivo
+        initializeAudio(); // Tenta inicializar o AudioContext aqui também
+    }).catch(err => {
+        console.error("Erro CRÍTICO ao carregar Aubio.js (WASM):", err);
+        statusDiv.textContent = 'Erro fatal ao carregar a biblioteca de análise. Recarregue a página ou verifique a conexão/console.';
+        fileInput.disabled = true;
+        analyzeButton.disabled = true;
+    });
+
+    // --- Event Listeners ---
+    fileInput.addEventListener('change', (event) => {
+        const files = event.target.files;
+        if (files.length > 0) {
+            selectedFile = files[0];
+            console.log('Arquivo selecionado:', selectedFile.name, selectedFile.type);
+
+            if (!selectedFile.type.startsWith('audio/mpeg') && !selectedFile.name.toLowerCase().endsWith('.mp3')) {
+                 statusDiv.textContent = 'Erro: Selecione um arquivo MP3 válido.';
+                 selectedFile = null;
+                 analyzeButton.disabled = true;
+                 resultsDiv.style.display = 'none';
+                 return;
+            }
+
+            statusDiv.textContent = `Arquivo "${selectedFile.name}" selecionado. Clique em "Analisar".`;
+            analyzeButton.disabled = false; // Habilita o botão de análise
+            resultsDiv.style.display = 'none'; // Oculta resultados antigos
+            bpmResultSpan.textContent = '-';
+            keyResultSpan.textContent = '-';
+
+        } else {
+            selectedFile = null;
+            analyzeButton.disabled = true;
+            statusDiv.textContent = 'Nenhum arquivo selecionado.';
+            console.log('Seleção de arquivo cancelada ou vazia.');
+        }
+    });
+
+    analyzeButton.addEventListener('click', () => {
+        if (!selectedFile) {
+            statusDiv.textContent = 'Erro: Nenhum arquivo MP3 selecionado.';
+            return;
+        }
+        if (!aubioInstance) {
+             statusDiv.textContent = 'Erro: Biblioteca Aubio.js não está pronta.';
+             return;
+        }
+        if (!initializeAudio()) { // Garante que o AudioContext existe
+            return;
+        }
+        // Tenta resumir o AudioContext explicitamente no clique (necessário em alguns navegadores)
+        if (audioContext.state === 'suspended') {
+            console.log("AudioContext suspenso, tentando resumir no clique...");
+            audioContext.resume().then(() => {
+                console.log("AudioContext resumido com sucesso.");
+                handleFileAnalysis();
+            }).catch(err => {
+                console.error("Falha ao resumir AudioContext no clique:", err);
+                statusDiv.textContent = 'Erro: Não foi possível ativar o áudio do navegador. Tente interagir com a página novamente.';
+                resetUIAfterError(); // Chama a função para reabilitar botões, etc.
+            });
+        } else {
+             console.log('Botão Analisar clicado (AudioContext já estava ativo).');
+             handleFileAnalysis();
+        }
+    });
+
+
+    // --- Funções ---
+    function handleFileAnalysis() {
+        resetUIBeforeAnalysis();
+        statusDiv.textContent = 'Lendo o arquivo...';
+        loader.style.display = 'inline-block';
+        analyzeButton.disabled = true; // Desabilita botão durante análise
+        fileInput.disabled = true; // Desabilita input durante análise
+
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            console.log('Arquivo lido com sucesso (FileReader onload).');
+            statusDiv.textContent = 'Decodificando o áudio... (Isso pode levar um tempo)';
+
+            // Não precisa mais do resume() aqui, pois foi feito no clique do botão
+            console.log('Iniciando decodeAudioData.');
+            if (!e.target.result) {
+                 console.error('FileReader result está vazio!');
+                 statusDiv.textContent = 'Erro interno ao ler o arquivo (resultado vazio).';
+                 resetUIAfterError();
+                 return;
+            }
+
+            audioContext.decodeAudioData(
+                e.target.result, // ArrayBuffer
+                (audioBuffer) => {
+                    console.log('Áudio decodificado com sucesso.');
+                    statusDiv.textContent = 'Analisando o áudio...';
+                    // Usar setTimeout para liberar a thread principal brevemente antes da análise pesada
+                    setTimeout(() => analyzeAudio(audioBuffer), 50);
+                },
+                (error) => {
+                    console.error("Erro ao decodificar o áudio:", error);
+                    let errorMsg = 'Erro ao decodificar o áudio.';
+                    // Tenta dar uma mensagem mais específica para erros comuns
+                    if (error && error.message) {
+                       errorMsg += ` Detalhe: ${error.message}`;
+                    } else if (error instanceof DOMException && error.name === 'EncodingError') {
+                       errorMsg += ' O formato do arquivo pode não ser suportado ou o arquivo está corrompido.';
+                    } else {
+                       errorMsg += ' Verifique se o arquivo MP3 é válido e não protegido.';
+                    }
+                    statusDiv.textContent = errorMsg;
+                    resetUIAfterError();
+                }
+            );
+        };
+
+        reader.onerror = function(e) {
+            console.error("Erro ao ler o arquivo (FileReader onerror):", e);
+            statusDiv.textContent = 'Erro crítico ao ler o arquivo do disco.';
+            resetUIAfterError();
+        };
+
+        console.log('Chamando reader.readAsArrayBuffer...');
+        try {
+             reader.readAsArrayBuffer(selectedFile);
+        } catch(readError) {
+             console.error("Erro imediato ao chamar readAsArrayBuffer:", readError);
+             statusDiv.textContent = 'Erro ao iniciar a leitura do arquivo.';
+             resetUIAfterError();
+        }
+    }
+
+    function analyzeAudio(audioBuffer) {
+        if (!aubioInstance) {
+            statusDiv.textContent = 'Erro: Aubio.js não está pronto para análise.';
+            resetUIAfterError();
+            return;
+        }
+        console.log('Iniciando analyzeAudio...');
+
+        // Tenta pegar os dados do canal esquerdo, se falhar (mono), pega o primeiro
+        let channelData;
+        try {
+            channelData = audioBuffer.getChannelData(0);
+        } catch (e) {
+            console.warn("Não foi possível obter canal 0, tentando canal 1 (pode ser mono):", e);
+            try {
+                 channelData = audioBuffer.getChannelData(1);
+            } catch (e2) {
+                 console.error("Erro ao obter dados de áudio de qualquer canal.", e2);
+                 statusDiv.textContent = "Erro ao extrair dados de áudio do arquivo.";
+                 resetUIAfterError();
+                 return;
+            }
+        }
+        if (!channelData || channelData.length === 0) {
+             console.error("Dados do canal de áudio estão vazios.");
+             statusDiv.textContent = "Arquivo de áudio parece estar vazio ou corrompido.";
+             resetUIAfterError();
+             return;
+        }
+
+
+        const sampleRate = audioBuffer.sampleRate;
+        const bufferSize = 4096;
+        const hopSize = 512;
+
+        console.log(`Parâmetros da análise: SampleRate=${sampleRate}, Samples=${channelData.length}, BufferSize=${bufferSize}, HopSize=${hopSize}`);
+
+        // --- Análise de BPM ---
+        let bpm = 0;
+        try {
+            console.log('Criando objeto Aubio Tempo...');
+            const tempo = new aubioInstance.Tempo(bufferSize, hopSize, sampleRate);
+            console.log('Processando para BPM...');
+            let currentPosition = 0;
+            while (currentPosition + bufferSize < channelData.length) {
+                const bufferChunk = channelData.slice(currentPosition, currentPosition + bufferSize);
+                tempo.do(bufferChunk); // Processa o chunk
+                currentPosition += hopSize;
+            }
+            bpm = tempo.getBpm();
+            tempo.free();
+            console.log(`BPM bruto detectado: ${bpm}`);
+            bpmResultSpan.textContent = bpm > 0 ? bpm.toFixed(1) : 'Não detectado';
+        } catch(err) {
+            console.error("Erro durante a análise de BPM:", err);
+            bpmResultSpan.textContent = 'Erro na análise';
+        }
+
+        // --- Análise de Tom (Nota Predominante Simplificada) ---
+        let dominantNote = 'Não detectado';
+        try {
+            console.log('Criando objeto Aubio Pitch...');
+            const pitchBufferSize = 2048;
+            const pitchHopSize = 512;
+            // Tenta usar 'yinfft' que é geralmente melhor para música
+            const pitch = new aubioInstance.Pitch('yinfft', pitchBufferSize, pitchHopSize, sampleRate);
+            const noteCounts = {};
+            console.log('Processando para Pitch/Nota...');
+
+            let currentPositionPitch = 0;
+            let framesProcessed = 0;
+            const confidenceThreshold = 0.7; // Aumentar se detectar muitas notas espúrias
+
+            while (currentPositionPitch + pitchBufferSize < channelData.length) {
+                const bufferChunk = channelData.slice(currentPositionPitch, currentPositionPitch + pitchBufferSize);
+                const frequency = pitch.do(bufferChunk);
+                const confidence = pitch.getConfidence();
+
+                if (frequency > 20 && confidence > confidenceThreshold) { // Frequência mínima e confiança
+                    const midiNum = freqToMidi(frequency);
+                    if (midiNum >= 0 && midiNum <= 127) {
+                       const noteIndex = Math.round(midiNum) % 12;
+                       const noteName = noteStrings[noteIndex];
+                       noteCounts[noteName] = (noteCounts[noteName] || 0) + 1;
+                    }
+                }
+                currentPositionPitch += pitchHopSize;
+                framesProcessed++;
+            }
+            pitch.free();
+            console.log(`Frames processados para pitch: ${framesProcessed}`);
+
+            let maxCount = 0;
+            dominantNote = 'Não detectado'; // Reinicia caso não haja notas acima do threshold
+            for (const note in noteCounts) {
+                if (noteCounts[note] > maxCount) {
+                    maxCount = noteCounts[note];
+                    dominantNote = note;
+                }
+            }
+            console.log(`Contagem de notas:`, noteCounts);
+            console.log(`Nota predominante estimada: ${dominantNote}`);
+            keyResultSpan.textContent = dominantNote;
+
+        } catch(err) {
+            console.error("Erro durante a análise de Pitch/Nota:", err);
+            keyResultSpan.textContent = 'Erro na análise';
+        }
+
+        // --- Exibe Resultados ---
+        console.log('Análise concluída.');
+        statusDiv.textContent = 'Análise concluída.';
+        loader.style.display = 'none';
+        resultsDiv.style.display = 'block';
+        analyzeButton.disabled = false; // Reabilita botão
+        fileInput.disabled = false;    // Reabilita input
+    }
+
+    function freqToMidi(frequency) {
+        if (frequency <= 0) return -1; // Evita log de zero ou negativo
+        return 69 + 12 * Math.log2(frequency / 440);
+    }
+
+    function resetUIBeforeAnalysis() {
+        resultsDiv.style.display = 'none';
+        bpmResultSpan.textContent = '-';
+        keyResultSpan.textContent = '-';
+        statusDiv.textContent = 'Iniciando análise...';
+        loader.style.display = 'none'; // Será mostrado depois se necessário
+    }
+
+    function resetUIAfterError() {
+        loader.style.display = 'none';
+        // Reabilita os controles para que o usuário possa tentar novamente
+        analyzeButton.disabled = false;
+        fileInput.disabled = false;
+        // A mensagem de erro já estará no statusDiv
+    }
+
+</script>
+
+</body>
+</html>
