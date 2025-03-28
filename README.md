@@ -6,4 +6,4 @@ Stock Portifolio optimization in a single html file:
 
 
 Bpm Tap - compute the bpm of a song by tapping tempo in a single html file:
-[Link](https://alexlaier.github.io/Portifolio/bpm_tap.html)
+[Link](https://alexlaier.github.io/Portifolio/tap_bpm.html)
